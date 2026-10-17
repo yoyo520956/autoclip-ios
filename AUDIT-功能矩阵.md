@@ -106,3 +106,12 @@
 - v0.2.0：聚类/合集、多平台参数、封面(帧合成)、发布文案
 - v0.3.0：B站下载+发布、Upload-Post、人物取景(Vision)、画幅转换完整版
 - v0.4.0：Studio 双路线/模板/艺术字/QA、whisper.cpp、快捷指令入口
+
+## 交付快照 v0.1.0（2026-10-18，构建 run 39077686687 SUCCESS）
+
+- 仓库：github.com/yoyo520956/autoclip-ios（commit 0f1b4caa，13 次构建收敛）
+- IPA：489,708B · md5 061feae87e5a22b907a21ff3736ffb50 · Release id 416123903 / asset 651859268
+- 核验：DisplayName AutoClip ✓ · BundleId com.youlong.AutoClip ✓ · Version 0.1.0 ✓ · 权限声明 4 项 ✓ · Prompts.json 235,910B（40 份提示词）在包 ✓ · 二进制特征 4/4 ✓
+- v0.1.0 实现范围：A 本地/相册导入+预检 ✓ · B Apple Speech 转录+SRT+分页 ✓（whisper.cpp/cloud 列 v0.4/v0.2）· C step1-4+聚类管线 ✓ · E 渲染（硬编/三画幅/4 字幕风格/水印/队列/断点恢复）✓ · F 文案管理 ✓（直发列 v0.3）· G 13 供应商设置+Keychain ✓
+- 13 轮编译修复全记录：资源平铺重名→Prompts.json 单文件 / @Observable→ObservableObject(iOS16) / TimeFmt.parse 提取 / async track API→同步 / NSNumber values+keyTimes / Provider 参数序 / Any 字典 / ViewBuilder 语句 / animationTool→videoComposition 属性 / 协议类型 as? AVMutable / SQLITE_TRANSIENT 桥接 / autoclosure self / Data(bytes:) / overlapping access / @Published didSet init 期 guard / 两段式 init 局部变量
+- 网络坑：git push SSL 抽风 6 次（3 次假失败：响应丢失但服务器已收——重试前先查远端 HEAD）

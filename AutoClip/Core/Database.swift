@@ -15,7 +15,7 @@ final class Database {
     func migrate() {
         queue.sync {
             openIfNeeded()
-            exec("""
+            _exec("""
             CREATE TABLE IF NOT EXISTS projects(
               id TEXT PRIMARY KEY, title TEXT NOT NULL, source_kind TEXT NOT NULL,
               source_ref TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'created',
@@ -60,7 +60,7 @@ final class Database {
         try? Paths.dbFile.deletingLastPathComponent().ensureDir()
         let rc = sqlite3_open_v2(Paths.dbFile.path, &db, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_FULLMUTEX, nil)
         guard rc == SQLITE_OK else { Log.app.error("SQLite 打开失败 rc=\(rc)"); return }
-        exec("PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000; PRAGMA synchronous=NORMAL;")
+        _exec("PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000; PRAGMA synchronous=NORMAL;")
     }
 
     func exec(_ sql: String) { queue.sync { self._exec(sql) } }
@@ -135,7 +135,7 @@ final class Database {
             }
         }
     }
-    func scalar(_ sql: String, _ bind: [Any] = []) -> Any? { _query(sql, bind).first?.first?.value }
+    func scalar(_ sql: String, _ bind: [Any] = []) -> Any? { queue.sync { self._query(sql, bind).first?.first?.value } }
     func kvGet(_ key: String) -> String? { query("SELECT value FROM kv WHERE key=?", [key]).first?["value"] as? String }
     func kvSet(_ key: String, _ value: String) { run("INSERT INTO kv(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", [key, value]) }
 }
