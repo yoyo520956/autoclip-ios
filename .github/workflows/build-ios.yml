@@ -1,0 +1,64 @@
+name: Build iOS IPA
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'AutoClip/**'
+      - 'project.yml'
+      - '.github/workflows/build-ios.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Pick older Xcode if available
+        run: |
+          for v in 16.4 16.3 16.2 16.1 16.0; do
+            if [ -d "/Applications/Xcode_${v}.app" ]; then
+              sudo xcode-select -s "/Applications/Xcode_${v}.app"
+              echo "Selected Xcode ${v}"
+              break
+            fi
+          done
+          xcodebuild -version
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate project
+        run: xcodegen generate
+
+      - name: Build app (unsigned)
+        run: |
+          set -o pipefail
+          xcodebuild -project AutoClip.xcodeproj -scheme AutoClip \
+            -sdk iphoneos -configuration Release \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            build | tail -40
+
+      - name: Package IPA
+        run: |
+          APP=$(find build/Build/Products/Release-iphoneos -maxdepth 1 -name "*.app" | head -1)
+          echo "APP=$APP"
+          mkdir -p Payload
+          cp -r "$APP" Payload/
+          zip -qry AutoClip-v${GITHUB_RUN_NUMBER}.ipa Payload
+          cp AutoClip-v${GITHUB_RUN_NUMBER}.ipa AutoClip-latest.ipa
+          rm -rf Payload
+          ls -la *.ipa
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: AutoClip-IPA
+          path: |
+            AutoClip-v${{ github.run_number }}.ipa
+            AutoClip-latest.ipa
+          if-no-files-found: error

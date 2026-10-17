@@ -1,0 +1,53 @@
+name: AutoClip
+options:
+  bundleIdPrefix: com.youlong
+  deploymentTarget:
+    iOS: "16.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    MARKETING_VERSION: 0.1.0
+    CURRENT_PROJECT_VERSION: 1
+    SWIFT_VERSION: 5.9
+    TARGETED_DEVICE_FAMILY: "1,2"
+    CODE_SIGN_STYLE: Manual
+    CODE_SIGN_IDENTITY: ""
+    CODE_SIGNING_REQUIRED: "NO"
+targets:
+  AutoClip:
+    type: application
+    platform: iOS
+    sources:
+      - path: AutoClip
+    info:
+      path: AutoClip/Info.plist
+      properties:
+        CFBundleDisplayName: AutoClip
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        NSSpeechRecognitionUsageDescription: 用于将视频语音本地转写为字幕。
+        NSMicrophoneUsageDescription: 仅在录制语音备注时使用麦克风。
+        NSPhotoLibraryUsageDescription: 用于从相册导入视频素材。
+        NSPhotoLibraryAddUsageDescription: 用于将生成的成片与封面保存到相册。
+        NSAppTransportSecurity:
+          NSAllowsArbitraryLoads: true
+          NSAllowsLocalNetworking: true
+        NSBonjourServices:
+          - _http._tcp
+          - _ipp._tcp
+        UIBackgroundModes:
+          - audio
+          - processing
+        LSSupportsOpeningDocumentsInPlace: true
+        CFBundleDocumentTypes:
+          - CFBundleTypeName: Video
+            LSHandlerRank: Alternate
+            LSItemContentTypes:
+              - public.movie
+              - public.mpeg-4
+              - com.apple.quicktime-movie
