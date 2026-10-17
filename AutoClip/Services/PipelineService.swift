@@ -62,7 +62,7 @@ final class PipelineService {
         // 建 Clip 记录
         Database.shared.run("DELETE FROM clips WHERE project_id=?", [p.id])
         for (i, c) in finalClips.enumerated() {
-            var clip = Clip(projectId: p.id, idx: i, start: c.start, end: c.end)
+            var clip = Clip(projectId: p.id, idx: i, start: c.start ?? 0, end: c.end ?? 0)
             clip.title = c.outline
             clip.desc = c.desc
             clip.hashtags = c.hashtags
