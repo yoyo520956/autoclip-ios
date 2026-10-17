@@ -4,6 +4,8 @@ import Security
 /// 设置中枢：供应商（10+，OpenAI 兼容统一）、转录、处理参数
 /// Keychain 存 API Key；其余 UserDefaults + kv 表镜像
 final class SettingsStore: ObservableObject {
+    /// init 完成前 didSet 不做联动（避免引用未初始化属性）
+    private var loaded = false
     static let shared = SettingsStore()
 
     // MARK: - LLM 供应商（env.example 全清单）
@@ -34,7 +36,14 @@ final class SettingsStore: ObservableObject {
 
     // 当前选择
     @Published var llmProviderId: String {
-        didSet { UserDefaults.standard.set(llmProviderId, forKey: "llm.provider"); if let p = Self.provider(llmProviderId) { if !p.baseURL.isEmpty { llmBaseURL = p.baseURL }; if !p.defaultModel.isEmpty { llmModel = p.defaultModel } } }
+        didSet {
+            UserDefaults.standard.set(llmProviderId, forKey: "llm.provider")
+            guard loaded else { return }
+            if let p = Self.provider(llmProviderId) {
+                if !p.baseURL.isEmpty { llmBaseURL = p.baseURL }
+                if !p.defaultModel.isEmpty { llmModel = p.defaultModel }
+            }
+        }
     }
     @Published var llmBaseURL: String { didSet { UserDefaults.standard.set(llmBaseURL, forKey: "llm.baseURL") } }
     @Published var llmModel: String { didSet { UserDefaults.standard.set(llmModel, forKey: "llm.model") } }
@@ -93,6 +102,7 @@ final class SettingsStore: ObservableObject {
         aspectMode = d.string(forKey: "out.aspect") ?? "original"
         clipMinDuration = d.object(forKey: "out.clipMin") as? Double ?? 20
         clipMaxDuration = d.object(forKey: "out.clipMax") as? Double ?? 90
+        loaded = true
     }
 
     func apiKey(for providerId: String) -> String { Keychain.get("key.\(providerId)") ?? "" }

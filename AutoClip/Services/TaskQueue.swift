@@ -119,8 +119,9 @@ final class TaskQueue {
         running[id] = nil
         lock.unlock()
         if t != nil {
+            let oldDetail = t?.detail ?? ""
             t?.state = state
-            t?.detail = detail.isEmpty ? (t?.detail ?? "") : detail
+            t?.detail = detail.isEmpty ? oldDetail : detail
             if state == "done" { t?.progress = 1 }
             t?.save()
             NotificationCenter.default.post(name: Self.progressNotification, object: nil)
