@@ -96,7 +96,7 @@ final class Database {
                 case SQLITE_TEXT: row[name] = String(cString: sqlite3_column_text(stmt, i))
                 case SQLITE_FLOAT: row[name] = sqlite3_column_double(stmt, i)
                 case SQLITE_INTEGER: row[name] = Int(sqlite3_column_int64(stmt, i))
-                case SQLITE_BLOB: row[name] = Data(sqlite3_column_blob(stmt, i), count: Int(sqlite3_column_bytes(stmt, i)))
+                case SQLITE_BLOB: row[name] = Data(bytes: sqlite3_column_blob(stmt, i), count: Int(sqlite3_column_bytes(stmt, i)))
                 default: row[name] = NSNull()
                 }
             }
