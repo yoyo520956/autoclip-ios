@@ -22,6 +22,16 @@ enum TimeFmt {
         let s = Int(t.rounded())
         return String(format: "%02d:%02d:%02d", s / 3600, (s % 3600) / 60, s % 60)
     }
+    static func parse(_ raw: String) -> Double? {
+        // HH:MM:SS,mmm / HH:MM:SS.mmm / MM:SS / 纯秒
+        let t = raw.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: ",", with: ".")
+        let parts = t.split(separator: ":").map(String.init)
+        switch parts.count {
+        case 3: return (Double(parts[0]) ?? 0) * 3600 + (Double(parts[1]) ?? 0) * 60 + (Double(parts[2]) ?? 0)
+        case 2: return (Double(parts[0]) ?? 0) * 60 + (Double(parts[1]) ?? 0)
+        default: return Double(t)
+        }
+    }
     static func stamp(_ t: Double) -> String {
         let ms = Int((t - floor(t)) * 1000)
         let s = Int(t)

@@ -70,7 +70,7 @@ final class TranscriptionService {
     /// AVAssetReader 抽取 PCM Int16 mono 16k
     private func extractPCM(url: URL) throws -> [Int16] {
         let asset = AVURLAsset(url: url)
-        guard let track = (try? asset.loadTracks(withMediaType: .audio))?.first else {
+        guard let track = asset.tracks(withMediaType: .audio).first else {
             throw AppError.transcribe("没有音频轨")
         }
         let reader = try AVAssetReader(asset: asset)

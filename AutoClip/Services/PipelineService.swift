@@ -123,22 +123,13 @@ final class PipelineService {
             id = try? c.decode(String.self, forKey: .id)
             finalScore = try? c.decode(Double.self, forKey: .final_score)
             recommendReason = try? c.decode(String.self, forKey: .recommend_reason)
-            start = Self.parseTime(startTime)
-            end = Self.parseTime(endTime)
+            start = TimeFmt.parse(startTime)
+            end = TimeFmt.parse(endTime)
         }
         func encode(to encoder: Encoder) throws { /* 仅本地使用 */ }
         init() { outline = ""; content = nil; startTime = ""; endTime = ""; id = nil; finalScore = nil; recommendReason = nil; start = nil; end = nil }
 
-        static func parseTime(_ s: String) -> Double? {
-            // HH:MM:SS,mmm 或 HH:MM:SS.mmm 或 MM:SS
-            let t = s.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: ",", with: ".")
-            let parts = t.split(separator: ":").map(String.init)
-            switch parts.count {
-            case 3: return (Double(parts[0]) ?? 0) * 3600 + (Double(parts[1]) ?? 0) * 60 + (Double(parts[2]) ?? 0)
-            case 2: return (Double(parts[0]) ?? 0) * 60 + (Double(parts[1]) ?? 0)
-            default: return Double(t)
-            }
-        }
+        static func parseTime(_ s: String) -> Double? { TimeFmt.parse(s) }
     }
 
     func step2Timeline(outlineMD: String, srtText: String, duration: Double) async throws -> [Candidate] {

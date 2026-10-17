@@ -2,7 +2,7 @@ import SwiftUI
 
 /// 设置页（对齐 SettingsPage.tsx：供应商/转录/处理参数/输出 全量配置）
 struct SettingsView: View {
-    @State private var s = SettingsStore.shared
+    @ObservedObject private var s = SettingsStore.shared
     @State private var apiKey = ""
     @State private var imageKey = ""
 

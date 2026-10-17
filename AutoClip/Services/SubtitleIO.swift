@@ -56,8 +56,8 @@ enum SubtitleIO {
             guard let arrowLine = arrow else { continue }
             let parts = arrowLine.components(separatedBy: "-->")
             guard parts.count == 2,
-                  let s = Candidate.parseTime(parts[0].trimmingCharacters(in: .whitespaces)),
-                  let e = Candidate.parseTime(parts[1].trimmingCharacters(in: .whitespaces)) else { continue }
+                  let s = TimeFmt.parse(parts[0].trimmingCharacters(in: .whitespaces)),
+                  let e = TimeFmt.parse(parts[1].trimmingCharacters(in: .whitespaces)) else { continue }
             let body = lines.filter { $0 != arrowLine && !$0.allSatisfy { $0.isNumber } }.joined(separator: "\n")
             if !body.isEmpty { out.append((s, e, body)) }
         }
