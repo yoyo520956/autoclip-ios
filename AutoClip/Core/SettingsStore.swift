@@ -82,9 +82,10 @@ final class SettingsStore: ObservableObject {
 
     init() {
         let d = UserDefaults.standard
-        llmProviderId = d.string(forKey: "llm.provider") ?? "dashscope"
-        llmBaseURL = d.string(forKey: "llm.baseURL") ?? Self.provider(llmProviderId)?.baseURL ?? ""
-        llmModel = d.string(forKey: "llm.model") ?? "qwen-plus"
+        let savedProvider = d.string(forKey: "llm.provider") ?? "dashscope"
+        llmProviderId = savedProvider
+        llmBaseURL = d.string(forKey: "llm.baseURL") ?? Self.provider(savedProvider)?.baseURL ?? ""
+        llmModel = d.string(forKey: "llm.model") ?? Self.provider(savedProvider)?.defaultModel ?? "qwen-plus"
         llmMaxTokens = d.object(forKey: "llm.maxTokens") as? Int ?? 4096
         llmTimeout = d.object(forKey: "llm.timeout") as? Double ?? 30
         imageProviderId = d.string(forKey: "img.provider") ?? "openai"
