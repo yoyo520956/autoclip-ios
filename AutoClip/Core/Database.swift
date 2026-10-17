@@ -1,6 +1,9 @@
 import Foundation
 import SQLite3
 
+/// SQLITE_TRANSIENT 宏的 Swift 桥接（SQLite3 模块不导出 C 宏）
+private let SQLITE_TRANSIENT = unsafeBitCast(OpaquePointer(bitPattern: -1), to: sqlite3_destructor_type.self)
+
 /// SQLite3 轻封装（替代 SQLAlchemy + Alembic；单文件 data/autoclip.db）
 final class Database {
     static let shared = Database()
@@ -60,7 +63,7 @@ final class Database {
         exec("PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000; PRAGMA synchronous=NORMAL;")
     }
 
-    func exec(_ sql: String) { queue.sync { _exec(sql) } }
+    func exec(_ sql: String) { queue.sync { self._exec(sql) } }
     private func _exec(_ sql: String) {
         openIfNeeded()
         var err: UnsafeMutablePointer<CChar>?
@@ -73,13 +76,13 @@ final class Database {
 
     /// 查询返回行字典（文本/双精度/整型自动映射）
     func query(_ sql: String, _ bind: [Any] = []) -> [[String: Any]] {
-        queue.sync { _query(sql, bind) }
+        queue.sync { self._query(sql, bind) }
     }
     private func _query(_ sql: String, _ bind: [Any]) -> [[String: Any]] {
         openIfNeeded()
         var stmt: OpaquePointer?
         guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
-            Log.app.error("prepare 失败: \(String(cString: sqlite3_errmsg(db)))")
+            Log.app.error("prepare 失败: \(String(cString: sqlite3_errmsg(self.db)))")
             return []
         }
         defer { sqlite3_finalize(stmt) }
@@ -107,13 +110,13 @@ final class Database {
             openIfNeeded()
             var stmt: OpaquePointer?
             guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
-                Log.app.error("prepare 失败: \(String(cString: sqlite3_errmsg(db)))")
+                Log.app.error("prepare 失败: \(String(cString: sqlite3_errmsg(self.db)))")
                 return
             }
             defer { sqlite3_finalize(stmt) }
             bindParams(stmt!, bind)
             if sqlite3_step(stmt) != SQLITE_DONE {
-                Log.app.error("exec 失败: \(String(cString: sqlite3_errmsg(db)))")
+                Log.app.error("exec 失败: \(String(cString: sqlite3_errmsg(self.db)))")
             }
         }
     }
