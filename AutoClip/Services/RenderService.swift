@@ -81,15 +81,11 @@ final class RenderService {
             videoLayer.frame = parent.frame
             parent.addSublayer(videoLayer)
             parent.addSublayer(overlay)
-            session.videoComposition = session.videoComposition ?? {
-                let vc = AVMutableVideoComposition()
-                vc.renderSize = renderSize
-                vc.frameDuration = CMTime(value: 1, timescale: 30)
-                return vc
-            }()
-            session.videoComposition?.customVideoCompositorClass = nil
-            let tool = AVVideoCompositionCoreAnimationTool(postProcessingAsVideoLayer: videoLayer, in: parent)
-            session.animationTool = tool
+            // animationTool 挂在 videoComposition 上（AVAssetExportSession 无此属性）
+            // original 模式：propertiesOf 自动生成完整 instructions；CI 模式：挂到现有 composition
+            let vc = session.videoComposition ?? AVMutableVideoComposition(propertiesOf: asset)
+            vc.animationTool = AVVideoCompositionCoreAnimationTool(postProcessingAsVideoLayer: videoLayer, in: parent)
+            session.videoComposition = vc
         }
 
         onProgress(.init(phase: "导出中", percent: 0.3))
@@ -186,7 +182,7 @@ final class RenderService {
             let t0 = relStart / clipDur, t1 = relEnd / clipDur
             anim.duration = clipDur
             anim.values = [0, 1, 1, 0].map { NSNumber(value: $0) }
-            anim.keyTimes = [max(0, t0 - 0.001), t0 + 0.002, max(t1 - 0.002, t0 + 0.003), min(1, t1)]
+            anim.keyTimes = [max(0, t0 - 0.001), t0 + 0.002, max(t1 - 0.002, t0 + 0.003), min(1, t1)].map { NSNumber(value: $0) }
             anim.fillMode = .forwards
             anim.isRemovedOnCompletion = false
             layer.opacity = 0
