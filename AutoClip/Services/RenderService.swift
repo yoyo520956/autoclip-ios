@@ -185,7 +185,7 @@ final class RenderService {
             let anim = CAKeyframeAnimation(keyPath: "opacity")
             let t0 = relStart / clipDur, t1 = relEnd / clipDur
             anim.duration = clipDur
-            anim.values = [0, 1, 1, 0]
+            anim.values = [0, 1, 1, 0].map { NSNumber(value: $0) }
             anim.keyTimes = [max(0, t0 - 0.001), t0 + 0.002, max(t1 - 0.002, t0 + 0.003), min(1, t1)]
             anim.fillMode = .forwards
             anim.isRemovedOnCompletion = false
