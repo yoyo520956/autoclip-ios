@@ -45,14 +45,14 @@ final class SettingsStore: ObservableObject {
             }
         }
     }
-    @Published var llmBaseURL: String { didSet { UserDefaults.standard.set(llmBaseURL, forKey: "llm.baseURL") } }
-    @Published var llmModel: String { didSet { UserDefaults.standard.set(llmModel, forKey: "llm.model") } }
-    @Published var llmMaxTokens: Int { didSet { UserDefaults.standard.set(llmMaxTokens, forKey: "llm.maxTokens") } }
-    @Published var llmTimeout: Double { didSet { UserDefaults.standard.set(llmTimeout, forKey: "llm.timeout") } }
+    @Published var llmBaseURL: String { didSet { guard loaded else { return }; UserDefaults.standard.set(llmBaseURL, forKey: "llm.baseURL") } }
+    @Published var llmModel: String { didSet { guard loaded else { return }; UserDefaults.standard.set(llmModel, forKey: "llm.model") } }
+    @Published var llmMaxTokens: Int { didSet { guard loaded else { return }; UserDefaults.standard.set(llmMaxTokens, forKey: "llm.maxTokens") } }
+    @Published var llmTimeout: Double { didSet { guard loaded else { return }; UserDefaults.standard.set(llmTimeout, forKey: "llm.timeout") } }
 
     // 图片供应商（封面生图）
-    @Published var imageProviderId: String { didSet { UserDefaults.standard.set(imageProviderId, forKey: "img.provider") } }
-    @Published var imageModel: String { didSet { UserDefaults.standard.set(imageModel, forKey: "img.model") } }
+    @Published var imageProviderId: String { didSet { guard loaded else { return }; UserDefaults.standard.set(imageProviderId, forKey: "img.provider") } }
+    @Published var imageModel: String { didSet { guard loaded else { return }; UserDefaults.standard.set(imageModel, forKey: "img.model") } }
 
     // 转录
     enum TranscribeSource: String, CaseIterable, Codable {
@@ -60,25 +60,25 @@ final class SettingsStore: ObservableObject {
         case cloud = "cloud"                // OpenAI 兼容 /audio/transcriptions
         var label: String { self == .appleSpeech ? "设备端识别（系统）" : "云端 API" }
     }
-    @Published var transcribeSource: TranscribeSource { didSet { UserDefaults.standard.set(transcribeSource.rawValue, forKey: "tr.source") } }
-    @Published var transcribeLang: String { didSet { UserDefaults.standard.set(transcribeLang, forKey: "tr.lang") } } // zh/en/ja/ko/auto
-    @Published var cloudTranscribeModel: String { didSet { UserDefaults.standard.set(cloudTranscribeModel, forKey: "tr.cloudModel") } }
+    @Published var transcribeSource: TranscribeSource { didSet { guard loaded else { return }; UserDefaults.standard.set(transcribeSource.rawValue, forKey: "tr.source") } }
+    @Published var transcribeLang: String { didSet { guard loaded else { return }; UserDefaults.standard.set(transcribeLang, forKey: "tr.lang") } } // zh/en/ja/ko/auto
+    @Published var cloudTranscribeModel: String { didSet { guard loaded else { return }; UserDefaults.standard.set(cloudTranscribeModel, forKey: "tr.cloudModel") } }
 
     // 处理参数（core/config.py 默认值 1:1）
-    @Published var chunkSize: Int { didSet { UserDefaults.standard.set(chunkSize, forKey: "proc.chunk") } }
-    @Published var minScoreThreshold: Double { didSet { UserDefaults.standard.set(minScoreThreshold, forKey: "proc.minScore") } }
-    @Published var maxClipsPerCollection: Int { didSet { UserDefaults.standard.set(maxClipsPerCollection, forKey: "proc.maxClips") } }
-    @Published var maxRetries: Int { didSet { UserDefaults.standard.set(maxRetries, forKey: "proc.retries") } }
+    @Published var chunkSize: Int { didSet { guard loaded else { return }; UserDefaults.standard.set(chunkSize, forKey: "proc.chunk") } }
+    @Published var minScoreThreshold: Double { didSet { guard loaded else { return }; UserDefaults.standard.set(minScoreThreshold, forKey: "proc.minScore") } }
+    @Published var maxClipsPerCollection: Int { didSet { guard loaded else { return }; UserDefaults.standard.set(maxClipsPerCollection, forKey: "proc.maxClips") } }
+    @Published var maxRetries: Int { didSet { guard loaded else { return }; UserDefaults.standard.set(maxRetries, forKey: "proc.retries") } }
 
     // 内容类型（prompt/ 七类：business/content_review/entertainment/experience/knowledge/opinion/speech）
-    @Published var contentType: String { didSet { UserDefaults.standard.set(contentType, forKey: "proc.contentType") } }
+    @Published var contentType: String { didSet { guard loaded else { return }; UserDefaults.standard.set(contentType, forKey: "proc.contentType") } }
 
     // 输出
-    @Published var watermarkEnabled: Bool { didSet { UserDefaults.standard.set(watermarkEnabled, forKey: "out.watermark") } }
-    @Published var subtitleStyle: String { didSet { UserDefaults.standard.set(subtitleStyle, forKey: "out.subtitleStyle") } } // clean/bold/box/accent
-    @Published var aspectMode: String { didSet { UserDefaults.standard.set(aspectMode, forKey: "out.aspect") } } // original/interview/fullscreen
-    @Published var clipMinDuration: Double { didSet { UserDefaults.standard.set(clipMinDuration, forKey: "out.clipMin") } }
-    @Published var clipMaxDuration: Double { didSet { UserDefaults.standard.set(clipMaxDuration, forKey: "out.clipMax") } }
+    @Published var watermarkEnabled: Bool { didSet { guard loaded else { return }; UserDefaults.standard.set(watermarkEnabled, forKey: "out.watermark") } }
+    @Published var subtitleStyle: String { didSet { guard loaded else { return }; UserDefaults.standard.set(subtitleStyle, forKey: "out.subtitleStyle") } } // clean/bold/box/accent
+    @Published var aspectMode: String { didSet { guard loaded else { return }; UserDefaults.standard.set(aspectMode, forKey: "out.aspect") } } // original/interview/fullscreen
+    @Published var clipMinDuration: Double { didSet { guard loaded else { return }; UserDefaults.standard.set(clipMinDuration, forKey: "out.clipMin") } }
+    @Published var clipMaxDuration: Double { didSet { guard loaded else { return }; UserDefaults.standard.set(clipMaxDuration, forKey: "out.clipMax") } }
 
     init() {
         let d = UserDefaults.standard
