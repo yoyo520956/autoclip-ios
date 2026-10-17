@@ -1,11 +1,9 @@
 import Foundation
 
-/// 提示词资产加载：prompt/ 目录原样打包进 Bundle（7 类内容 × 5 提示词 + 通用 5 份）
-/// 选择顺序：contentType 专用版 → 通用版
+/// 提示词资产：原版 prompt/ 全部 40 份（7 类内容 × 5 提示词 + 通用 5 份）
+/// 预打包为单文件 Resources/Prompts.json（避免资源平铺重名冲突）
+/// key: "contentType/名称" 为专用版，"名称" 为通用版；解析顺序专用 → 通用
 enum PromptAssets {
-    private static var cache: [String: String] = [:]
-    private static let lock = NSLock()
-
     static let contentTypes = ["business", "content_review", "entertainment", "experience", "knowledge", "opinion", "speech"]
     static let contentTypeLabels = [
         "business": "商业财经", "content_review": "内容测评", "entertainment": "娱乐综艺",
@@ -13,22 +11,22 @@ enum PromptAssets {
     ]
     static let promptNames = ["大纲", "时间点", "推荐理由", "标题生成", "主题聚类"]
 
-    static func load(contentType: String, name: String) -> String {
-        lock.lock(); defer { lock.unlock() }
-        let key = "\(contentType)/\(name)"
-        if let v = cache[key] { return v }
-        let base = Bundle.main.resourceURL!.appendingPathComponent("Prompts", isDirectory: true)
-        // 专用版优先
-        let specific = base.appendingPathComponent("\(contentType)/\(name).txt")
-        let generic = base.appendingPathComponent("\(name).txt")
-        for url in [specific, generic] {
-            if let s = try? String(contentsOf: url, encoding: .utf8), !s.isEmpty {
-                cache[key] = s
-                return s
-            }
+    private static let dict: [String: String] = {
+        guard let url = Bundle.main.url(forResource: "Prompts", withExtension: "json"),
+              let data = try? Data(contentsOf: url),
+              let d = try? JSONDecoder().decode([String: String].self, from: data) else {
+            Log.pipeline.error("Prompts.json 缺失或损坏")
+            return [:]
         }
-        Log.pipeline.error("提示词缺失: \(key)")
-        cache[key] = "请完成任务。"
-        return cache[key]!
+        return d
+    }()
+
+    static func load(contentType: String, name: String) -> String {
+        if let v = dict["\(contentType)/\(name)"], !v.isEmpty { return v }
+        if let v = dict[name], !v.isEmpty { return v }
+        Log.pipeline.error("提示词缺失: \(contentType)/\(name)")
+        return "请根据输入完成任务，只输出 JSON。"
     }
+
+    static var assetCount: Int { dict.count }
 }
