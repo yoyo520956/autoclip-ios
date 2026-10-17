@@ -174,9 +174,10 @@ final class PipelineService {
     // MARK: - step3 评分
     func step3Scoring(candidates: [Candidate]) async throws -> [Candidate] {
         let prompt = PromptAssets.load(contentType: settings.contentType, name: "推荐理由")
-        let input = try JSONEncoder().encode(candidates.map { c in
-            ["outline": c.outline, "content": c.content ?? [], "start_time": c.startTime, "end_time": c.endTime]
-        })
+        let inputArr: [[String: Any]] = candidates.map { c in
+            ["outline": c.outline, "content": c.content ?? [String](), "start_time": c.startTime, "end_time": c.endTime]
+        }
+        let input = try JSONSerialization.data(withJSONObject: inputArr)
         let raw = try await chat(user: prompt + "\n\n" + String(data: input, encoding: .utf8)!, jsonMode: true)
         let scored = (try? LLMService.extractJSON(raw, [Candidate].self)) ?? []
         // 按 start_time 对齐合并

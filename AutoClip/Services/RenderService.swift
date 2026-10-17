@@ -83,7 +83,7 @@ final class RenderService {
             parent.addSublayer(overlay)
             // animationTool 挂在 videoComposition 上（AVAssetExportSession 无此属性）
             // original 模式：propertiesOf 自动生成完整 instructions；CI 模式：挂到现有 composition
-            let vc = session.videoComposition ?? AVMutableVideoComposition(propertiesOf: asset)
+            let vc = (session.videoComposition as? AVMutableVideoComposition) ?? AVMutableVideoComposition(propertiesOf: asset)
             vc.animationTool = AVVideoCompositionCoreAnimationTool(postProcessingAsVideoLayer: videoLayer, in: parent)
             session.videoComposition = vc
         }

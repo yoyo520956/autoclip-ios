@@ -37,7 +37,7 @@ struct PublishView: View {
                         .padding(.horizontal, 14)
                     }
                     .padding(.vertical, 10)
-                    if let first = clips.first {
+                    if !clips.isEmpty {
                         List {
                             ForEach(clips) { clip in
                                 VStack(alignment: .leading, spacing: 6) {
@@ -61,7 +61,6 @@ struct PublishView: View {
                             }
                         }
                         .listStyle(.plain)
-                        _ = first
                     } else {
                         Spacer()
                     }
