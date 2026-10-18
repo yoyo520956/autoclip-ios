@@ -26,11 +26,122 @@ final class TranscriptionService {
         }
     }
 
-    /// 主入口：视频/音频文件 → [Segment]（词级时间戳尽量保留）
+    /// 主入口：视频/音频文件 → [Segment]。
+    /// 严禁本地：默认云端 NVIDIA omni；失败直接抛错（带限流提示），绝不静默降级。
     func transcribe(url: URL, lang: String, onProgress: @escaping (Progress) -> Void) async throws -> [Segment] {
         switch SettingsStore.shared.transcribeSource {
-        case .appleSpeech: return try await localSpeech(url: url, lang: lang, onProgress: onProgress)
-        case .cloud: return try await cloud(url: url, onProgress: onProgress)
+        case .nvidiaOmni, .appleSpeech:
+            return try await nvidiaOmni(url: url, onProgress: onProgress)
+        case .cloud:
+            return try await cloud(url: url, onProgress: onProgress)
+        }
+    }
+
+    // MARK: - 云端 ASR（NVIDIA nemotron-omni：input_audio → 文字；20s 块，块内分句）
+    private func nvidiaOmni(url: URL, onProgress: @escaping (Progress) -> Void) async throws -> [Segment] {
+        guard let nvKey = SettingsStore.builtInKeys["NV_KEY"], !nvKey.isEmpty else {
+            throw AppError.transcribe("无内置 NVIDIA Key（构建未注入 NV_KEY）")
+        }
+        onProgress(.init(phase: "抽取音频", percent: 0.02))
+        let pcm = try extractPCM(url: url)
+        var all: [Segment] = []
+        let samplesPerChunk = 16000 * 20
+        var offset = 0.0
+        var idx = 0
+        var cursor = 0
+        var lastError: Error = AppError.transcribe("空音频")
+        var success = 0
+        while cursor < pcm.count {
+            let end = min(cursor + samplesPerChunk, pcm.count)
+            let slice = Array(pcm[cursor..<end])
+            let dur = Double((end - cursor) / 2 / 16000)
+            // 限流重试（503 高发：3 次指数退避）
+            var text: String? = nil
+            for attempt in 0..<3 {
+                do { text = try await omniASR(samples: slice, nvKey: nvKey); break }
+                catch {
+                    lastError = error
+                    let wait = pow(2.0, Double(attempt)) * 1.5
+                    Log.transcribe.error("omni 块失败（第\(attempt + 1)次）: \(error.localizedDescription)，退避\(wait)s")
+                    if attempt < 2 { try? await Task.sleep(nanoseconds: UInt64(wait * 1_000_000_000)) }
+                }
+            }
+            if let text {
+                if !text.isEmpty {
+                    for seg in Self.splitToSegments(text, blockStart: offset, blockDur: dur) {
+                        all.append(Segment(idx: idx, start: seg.0, end: seg.1, text: seg.2, words: nil))
+                        idx += 1
+                    }
+                    success += 1
+                }
+            } else if success == 0 {
+                throw lastError   // 一块都没成功：整体失败（上层显示限流原因）
+            }
+            offset += dur
+            cursor = end
+            onProgress(.init(phase: "云端转写中", percent: min(0.95, Double(cursor) / Double(max(1, pcm.count)))))
+        }
+        guard success > 0 else { throw lastError }
+        onProgress(.init(phase: "转写完成", percent: 1.0))
+        return all
+    }
+
+    private func omniASR(samples: [Int16], nvKey: String) async throws -> String {
+        var pcm = Data()
+        for v in samples { withUnsafeBytes(of: v.littleEndian) { pcm.append(contentsOf: $0) } }
+        var wav = Data()
+        func str(_ s: String) { wav.append(s.data(using: .ascii)!) }
+        func u32(_ v: UInt32) { var x = v.littleEndian; withUnsafeBytes(of: &x) { wav.append(contentsOf: $0) } }
+        func u16(_ v: UInt16) { var x = v.littleEndian; withUnsafeBytes(of: &x) { wav.append(contentsOf: $0) } }
+        str("RIFF"); u32(UInt32(36 + pcm.count)); str("WAVE")
+        str("fmt "); u32(16); u16(1); u16(1); u32(16000); u32(32000); u16(2); u16(16)
+        str("data"); u32(UInt32(pcm.count)); wav.append(pcm)
+        let b64 = wav.base64EncodedString()
+        let body: [String: Any] = [
+            "model": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
+            "messages": [["role": "user", "content": [
+                ["type": "text", "text": "把这段音频里的语音逐句转写成文字。没有语音或只有噪音时，只输出：[无语音]"],
+                ["type": "input_audio", "input_audio": ["data": b64, "format": "wav"]],
+            ]]],
+            "max_tokens": 800,
+        ]
+        var req = URLRequest(url: URL(string: "https://integrate.api.nvidia.com/v1/chat/completions")!, timeoutInterval: 150)
+        req.httpMethod = "POST"
+        req.setValue("Bearer \(nvKey)", forHTTPHeaderField: "Authorization")
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = try JSONSerialization.data(withJSONObject: body)
+        let (data, resp) = try await URLSession.shared.data(for: req)
+        guard let http = resp as? HTTPURLResponse, http.statusCode == 200 else {
+            let code = (resp as? HTTPURLResponse)?.statusCode ?? -1
+            throw AppError.transcribe(code == 503 ? "云端语音识别限流（503），请稍后重试" : "云端 ASR HTTP \(code)")
+        }
+        guard let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let choices = obj["choices"] as? [[String: Any]],
+              let msg = choices.first?["message"] as? [String: Any],
+              let text = msg["content"] as? String else {
+            throw AppError.transcribe("云端 ASR 响应异常")
+        }
+        let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if t.isEmpty || t.contains("[无语音]") { return "" }
+        return t
+    }
+
+    /// 块文本 → 按句切分，块内均分时长
+    static func splitToSegments(_ text: String, blockStart: Double, blockDur: Double) -> [(Double, Double, String)] {
+        let clean = text.replacingOccurrences(of: "\n", with: " ").trimmingCharacters(in: .whitespaces)
+        guard !clean.isEmpty, blockDur > 0.2 else { return [] }
+        let breakers: Set<Character> = ["。", "！", "？", "；"]
+        var sentences: [String] = []
+        var cur = ""
+        for ch in clean {
+            cur.append(ch)
+            if breakers.contains(ch), cur.count >= 6 { sentences.append(cur); cur = "" }
+        }
+        if !cur.isEmpty { sentences.append(cur) }
+        guard !sentences.isEmpty else { return [(blockStart, blockStart + blockDur, clean)] }
+        let per = blockDur / Double(sentences.count)
+        return sentences.enumerated().map { (i, s) in
+            (blockStart + per * Double(i), blockStart + per * Double(i + 1), s.trimmingCharacters(in: .whitespaces))
         }
     }
 

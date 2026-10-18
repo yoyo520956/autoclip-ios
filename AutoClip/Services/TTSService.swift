@@ -47,17 +47,10 @@ final class TTSService {
     func synthesize(text: String, voiceId: String, rate: Double, out: URL) async throws -> String {
         let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { throw AppError.render("配音文本为空") }
-        // 1) 云端 TTS（nemotron omni；限流/失败 → 降级）
-        do {
-            let engine = try await cloudTTS(text: text, out: out)
-            Log.transcribe.log("TTS 引擎: \(engine)")
-            return engine
-        } catch {
-            Log.transcribe.error("云端 TTS 失败（降级系统合成）: \(error.localizedDescription)")
-        }
-        // 2) 系统合成（保底）
-        try await systemTTS(text: text, voiceId: voiceId, rate: rate, out: out)
-        return "system_tts"
+        // 只走云端（严禁本地）；失败直接抛错，任务可见失败原因
+        let engine = try await cloudTTS(text: text, out: out)
+        Log.transcribe.log("TTS 引擎: \(engine)")
+        return engine
     }
 
     /// NVIDIA nemotron-omni 云端 TTS：chat audio 输出（限流时 503 抛错）
