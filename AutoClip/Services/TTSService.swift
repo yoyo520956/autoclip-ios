@@ -7,9 +7,9 @@ import UIKit
 enum KeyframeExtractor {
     struct TimestampedFrame { var time: Double; var data: Data }
     /// 均匀抽 count 帧，最长边 maxDim，JPEG 0.7；返回带时间戳（声画对齐用）
-    static func extractTimestamped(url: URL, count: Int = 10, maxDim: CGFloat = 512) throws -> [TimestampedFrame] {
+    static func extractTimestamped(url: URL, count: Int = 10, maxDim: CGFloat = 512) async throws -> [TimestampedFrame] {
         let asset = AVURLAsset(url: url)
-        let duration = try asset.load(.duration).seconds
+        let duration = try await asset.load(.duration).seconds
         guard duration > 0.5, count > 0 else { return [] }
         let gen = AVAssetImageGenerator(asset: asset)
         gen.appliesPreferredTrackTransform = true
@@ -30,8 +30,8 @@ enum KeyframeExtractor {
         return frames
     }
     /// 兼容旧接口
-    static func extract(url: URL, count: Int = 10, maxDim: CGFloat = 512) throws -> [Data] {
-        try extractTimestamped(url: url, count: count, maxDim: maxDim).map { $0.data }
+    static func extract(url: URL, count: Int = 10, maxDim: CGFloat = 512) async throws -> [Data] {
+        try await extractTimestamped(url: url, count: count, maxDim: maxDim).map { $0.data }
     }
 }
 
@@ -113,7 +113,8 @@ final class TTSService {
             let synth = AVSpeechSynthesizer()
             var audioFile: AVAudioFile?
             var failed = false
-            let delegate = TTSWriteDelegate { buffer in
+            let delegate = TTSWriteDelegate { raw in
+                guard let buffer = raw as? AVAudioPCMBuffer else { return }
                 if audioFile == nil {
                     audioFile = try? AVAudioFile(forWriting: out, settings: buffer.format.settings,
                                                  commonFormat: buffer.format.commonFormat, interleaved: buffer.format.isInterleaved)
@@ -160,6 +161,9 @@ final class TTSWriteDelegate {
         self.onBuffer = onBuffer
         self.onFinish = onFinish
     }
-    func consume(_ buffer: AVAudioPCMBuffer) { onBuffer(buffer) }
+    func consume(_ buffer: AVAudioBuffer) {
+        guard let pcm = buffer as? AVAudioPCMBuffer else { return }
+        onBuffer(pcm)
+    }
     func finish(_ err: Error? = nil) { timer?.cancel(); onFinish(err) }
 }

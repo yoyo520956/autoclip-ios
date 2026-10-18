@@ -41,7 +41,7 @@ final class PipelineService {
         if settings.contentType == "drama" {
             onProgress(.init(phase: "画面分析（关键帧）", percent: 0.35))
             do {
-                let frames = try KeyframeExtractor.extractTimestamped(url: url, count: 10)
+                let frames = try await KeyframeExtractor.extractTimestamped(url: url, count: 10)
                 if !frames.isEmpty {
                     let frameList = frames.map { String(format: "第 %.1f 秒", $0.time) }.joined(separator: "、")
                     visualScript = try await LLMService.shared.visionChat(

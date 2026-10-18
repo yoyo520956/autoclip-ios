@@ -134,7 +134,7 @@ final class RenderService {
         let dubAsset = AVURLAsset(url: dubURL)
         if let dubSrc = dubAsset.tracks(withMediaType: .audio).first,
            let dub = comp.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid) {
-            let dubDur = (try? dubAsset.load(.duration)).map { CMTimeGetSeconds($0) } ?? 0
+            let dubDur = CMTimeGetSeconds(dubAsset.duration)
             let want = min(CMTimeGetSeconds(range.duration), dubDur)
             if want > 0.1 {
                 try? dub.insertTimeRange(CMTimeRange(start: .zero, duration: CMTime(seconds: want, preferredTimescale: 600)), of: dubSrc, at: .zero)

@@ -163,7 +163,7 @@ final class SettingsStore: ObservableObject {
         let voices = AVSpeechSynthesisVoice.speechVoices()
         let zh = voices.filter { $0.language.hasPrefix("zh") }
             .map { VoiceInfo(id: $0.identifier, name: "\($0.name)（\($0.language)）", lang: $0.language) }
-        let other = voices.filter { !$0.language.hasPrefix("zh") && $0.language.hasPrefix(["en", "ja", "ko"]) }
+        let other = voices.filter { v in !v.language.hasPrefix("zh") && ["en", "ja", "ko"].contains { v.language.hasPrefix($0) } }
             .map { VoiceInfo(id: $0.identifier, name: "\($0.name)（\($0.language)）", lang: $0.language) }
         return zh + other
     }
