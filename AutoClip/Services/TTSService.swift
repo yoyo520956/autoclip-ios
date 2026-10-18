@@ -125,7 +125,6 @@ final class TTSService {
                 else if !failed { cont.resume() }
             }
             synth.write(utterance) { buffer in
-                guard let buffer else { return }
                 delegate.consume(buffer)
             }
             // write 的完成判定：buffer 流结束由 delegate 收尾回调驱动（iOS 17+ write 无完成回调）
