@@ -40,17 +40,17 @@ final class RenderService {
         // 导出素材：有配音时构建 composition（视频+原音压低+配音轨），否则用原 asset
         var exportAsset: AVAsset = asset
         var exportRange = range
-        if let dubURL, FileManager.default.fileExists(atPath: dubURL.path),
-           let comp = Self.buildDubComposition(asset: asset, range: range, dubURL: dubURL) {
+        if let dub = dubbingURL, FileManager.default.fileExists(atPath: dub.path),
+           let comp = Self.buildDubComposition(asset: asset, range: range, dubURL: dub) {
             exportAsset = comp
             exportRange = CMTimeRange(start: .zero, duration: comp.duration)
             let keep = Float(max(0, min(1, 1.0 - SettingsStore.shared.dubbingVolume)))
             let mix = AVMutableAudioMix()
             var ps: [AVMutableAudioMixInputParameters] = []
-            let audioTracks = comp.tracks(withMediaType: .audio)
+            let audioTracks = comp.tracks(withMediaType: AVMediaType.audio)
             for (idx, tr) in audioTracks.enumerated() {
                 let p = AVMutableAudioMixInputParameters(track: tr)
-                p.setVolume(idx == 0 ? keep : 1.0, at: .zero)   // 第 1 条=原音（压低），第 2 条=配音
+                p.setVolume(idx == 0 ? keep : Float(1.0), at: CMTime.zero)   // 第 1 条=原音（压低），第 2 条=配音
                 ps.append(p)
             }
             mix.inputParameters = ps
