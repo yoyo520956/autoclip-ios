@@ -14,9 +14,10 @@ final class RenderService {
 
     struct RenderProgress { var phase: String; var percent: Double }
 
-    func render(clip: Clip, project: Project, onProgress: @escaping (RenderProgress) -> Void) async throws -> URL {
+    func render(clip: Clip, project: Project, dubbingURL: URL? = nil, onProgress: @escaping (RenderProgress) -> Void) async throws -> URL {
         var c = clip
         c.renderStatus = .rendering
+        var sessionAudioMix: AVAudioMix?
         c.save()
         defer { if c.renderStatus != .done { c.renderStatus = .failed; c.save() } }
 
@@ -35,12 +36,34 @@ final class RenderService {
         let clipDur = max(0.5, CMTimeGetSeconds(range.duration))
 
         onProgress(.init(phase: "准备", percent: 0.05))
-        guard let session = AVAssetExportSession(asset: asset, presetName: AVAssetExportPresetHighestQuality) else {
+
+        // 导出素材：有配音时构建 composition（视频+原音压低+配音轨），否则用原 asset
+        var exportAsset: AVAsset = asset
+        var exportRange = range
+        if let dubURL, FileManager.default.fileExists(atPath: dubURL.path),
+           let comp = Self.buildDubComposition(asset: asset, range: range, dubURL: dubURL) {
+            exportAsset = comp
+            exportRange = CMTimeRange(start: .zero, duration: comp.duration)
+            let keep = Float(max(0, min(1, 1.0 - SettingsStore.shared.dubbingVolume)))
+            let mix = AVMutableAudioMix()
+            var ps: [AVMutableAudioMixInputParameters] = []
+            let audioTracks = comp.tracks(withMediaType: .audio)
+            for (idx, tr) in audioTracks.enumerated() {
+                let p = AVMutableAudioMixInputParameters(track: tr)
+                p.setVolume(idx == 0 ? keep : 1.0, at: .zero)   // 第 1 条=原音（压低），第 2 条=配音
+                ps.append(p)
+            }
+            mix.inputParameters = ps
+            sessionAudioMix = mix
+        }
+
+        guard let session = AVAssetExportSession(asset: exportAsset, presetName: AVAssetExportPresetHighestQuality) else {
             throw AppError.render("导出会话创建失败")
         }
         session.outputURL = outURL
         session.outputFileType = .mp4
-        session.timeRange = range
+        session.timeRange = exportRange
+        session.audioMix = sessionAudioMix
         session.shouldOptimizeForNetworkUse = true
 
         // 目标画幅
@@ -55,7 +78,7 @@ final class RenderService {
             let targetH: CGFloat = 1920
             let targetW: CGFloat = 1080
             renderSize = CGSize(width: targetW, height: targetH)
-            let comp = AVMutableVideoComposition(asset: asset, applyingCIFiltersWithHandler: { [weak self] request in
+            let comp = AVMutableVideoComposition(asset: exportAsset, applyingCIFiltersWithHandler: { [weak self] request in
                 guard let self else { return }
                 let out = self.compositeFrame(request.sourceImage, mode: mode, target: renderSize)
                 request.finish(with: out, context: self.ciContext)
@@ -83,7 +106,7 @@ final class RenderService {
             parent.addSublayer(overlay)
             // animationTool 挂在 videoComposition 上（AVAssetExportSession 无此属性）
             // original 模式：propertiesOf 自动生成完整 instructions；CI 模式：挂到现有 composition
-            let vc = (session.videoComposition as? AVMutableVideoComposition) ?? AVMutableVideoComposition(propertiesOf: asset)
+            let vc = (session.videoComposition as? AVMutableVideoComposition) ?? AVMutableVideoComposition(propertiesOf: exportAsset)
             vc.animationTool = AVVideoCompositionCoreAnimationTool(postProcessingAsVideoLayer: videoLayer, in: parent)
             session.videoComposition = vc
         }
@@ -97,6 +120,27 @@ final class RenderService {
         onProgress(.init(phase: "完成", percent: 1.0))
         Log.render.log("渲染完成 \(outURL.lastPathComponent) \(TimeFmt.hms(clipDur))")
         return outURL
+    }
+
+    /// 构建配音 composition：视频轨 + 原音轨 + 配音轨（时间轴已裁剪到 clip）
+    private static func buildDubComposition(asset: AVURLAsset, range: CMTimeRange, dubURL: URL) -> AVMutableComposition? {
+        guard let vSrc = asset.tracks(withMediaType: .video).first,
+              let aSrc = asset.tracks(withMediaType: .audio).first else { return nil }
+        let comp = AVMutableComposition()
+        guard let v = comp.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid),
+              let a = comp.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid) else { return nil }
+        try? v.insertTimeRange(range, of: vSrc, at: .zero)
+        try? a.insertTimeRange(range, of: aSrc, at: .zero)
+        let dubAsset = AVURLAsset(url: dubURL)
+        if let dubSrc = dubAsset.tracks(withMediaType: .audio).first,
+           let dub = comp.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid) {
+            let dubDur = (try? dubAsset.load(.duration)).map { CMTimeGetSeconds($0) } ?? 0
+            let want = min(CMTimeGetSeconds(range.duration), dubDur)
+            if want > 0.1 {
+                try? dub.insertTimeRange(CMTimeRange(start: .zero, duration: CMTime(seconds: want, preferredTimescale: 600)), of: dubSrc, at: .zero)
+            }
+        }
+        return comp
     }
 
     // MARK: - 逐帧画幅合成（fullscreen 填满裁切 / interview 模糊底）

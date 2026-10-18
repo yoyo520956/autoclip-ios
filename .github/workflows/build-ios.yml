@@ -34,6 +34,19 @@ jobs:
       - name: Generate project
         run: xcodegen generate
 
+      - name: Inject built-in provider keys (Secrets → SecretKeys.plist)
+        run: |
+          cat > AutoClip/SecretKeys.plist <<PLISTEOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>AGNES_KEY</key><string>${{ secrets.AGNES_KEY }}</string>
+            <key>HCN_KEY</key><string>${{ secrets.HCN_KEY }}</string>
+            <key>NV_KEY</key><string>${{ secrets.NV_KEY }}</string>
+          </dict></plist>
+          PLISTEOF
+          plutil -lint AutoClip/SecretKeys.plist
+
       - name: Build app (unsigned)
         run: |
           set -o pipefail

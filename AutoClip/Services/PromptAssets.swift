@@ -4,10 +4,11 @@ import Foundation
 /// 预打包为单文件 Resources/Prompts.json（避免资源平铺重名冲突）
 /// key: "contentType/名称" 为专用版，"名称" 为通用版；解析顺序专用 → 通用
 enum PromptAssets {
-    static let contentTypes = ["business", "content_review", "entertainment", "experience", "knowledge", "opinion", "speech"]
+    static let contentTypes = ["business", "content_review", "entertainment", "experience", "knowledge", "opinion", "speech", "drama"]
     static let contentTypeLabels = [
         "business": "商业财经", "content_review": "内容测评", "entertainment": "娱乐综艺",
         "experience": "经验分享", "knowledge": "知识科普", "opinion": "观点评论", "speech": "演讲访谈",
+        "drama": "短剧（声画双分析）",
     ]
     static let promptNames = ["大纲", "时间点", "推荐理由", "标题生成", "主题聚类"]
 

@@ -80,9 +80,25 @@ final class TaskQueue {
             case "render_project":
                 guard let project = Project.get(pid) else { throw AppError.render("项目不存在") }
                 let clips = Clip.forProject(pid)
+                let dubOn = SettingsStore.shared.dubbingEnabled
                 for (i, clip) in clips.enumerated() {
                     guard !canceled.contains(t.id) else { throw CancellationError() }
-                    try await RenderService.shared.render(clip: clip, project: project) { pr in
+                    var dubURL: URL? = nil
+                    if dubOn {
+                        self.update(t.id, progress: (Double(i) + 0.0) / Double(max(1, clips.count)), detail: "配音合成 \(i + 1)/\(clips.count)")
+                        let segs = Segment.all(projectId: pid).filter { $0.end > clip.start && $0.start < clip.end }
+                        let dubText = segs.map { $0.text }.joined(separator: "。")
+                        if !dubText.isEmpty {
+                            let dv = Paths.temp.appendingPathComponent("dub_\(clip.id).wav")
+                            try? FileManager.default.removeItem(at: dv)
+                            let sset = SettingsStore.shared
+                            try await TTSService.shared.synthesize(text: dubText,
+                                voiceId: sset.dubbingVoiceId.isEmpty ? SettingsStore.defaultVoiceId() : sset.dubbingVoiceId,
+                                rate: sset.dubbingRate, out: dv)
+                            if FileManager.default.fileExists(atPath: dv.path) { dubURL = dv }
+                        }
+                    }
+                    try await RenderService.shared.render(clip: clip, project: project, dubbingURL: dubURL) { pr in
                         let overall = (Double(i) + pr.percent) / Double(max(1, clips.count))
                         self.update(t.id, progress: overall, detail: "切片 \(i + 1)/\(clips.count) \(pr.phase)")
                     }

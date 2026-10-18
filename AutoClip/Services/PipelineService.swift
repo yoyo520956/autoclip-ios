@@ -34,10 +34,30 @@ final class PipelineService {
         let srtPath = Paths.subtitles.appendingPathComponent("\(p.id).srt")
         try SubtitleIO.writeSRT(segments: segs, to: srtPath)
 
+        let srtText = try String(contentsOf: srtPath, encoding: .utf8)
+
+        // 短剧模式：声画双分析 —— 字幕（声）+ 关键帧（画，Agnes 多模态）→ 画面脚本
+        var visualScript = ""
+        if settings.contentType == "drama" {
+            onProgress(.init(phase: "画面分析（关键帧）", percent: 0.35))
+            do {
+                let frames = try KeyframeExtractor.extractTimestamped(url: url, count: 10)
+                if !frames.isEmpty {
+                    let frameList = frames.map { String(format: "第 %.1f 秒", $0.time) }.joined(separator: "、")
+                    visualScript = try await LLMService.shared.visionChat(
+                        system: "你是短剧画面分析师。用户给你一部短剧的关键帧序列（每帧已标注时间戳，共\(frames.count)帧）与全片字幕（带时间轴）。画面与声音来自同一条时间轴，分析时必须相互对应。请输出画面脚本：逐帧以『第 X.X 秒』开头，描述场景、出场人物、动作、情绪、屏幕字幕/台词卡；最后总结叙事线与情绪转折点，并列出你判断的高能片段时间区间（用于切片）。只输出文本脚本。",
+                        userText: "关键帧时间戳：\(frameList)\n\n全片字幕如下：\n\n" + String(srtText.prefix(6000)),
+                        images: frames.map { LLMService.VisionImage(data: $0.data) })
+                    Log.pipeline.log("画面脚本 \(visualScript.count) 字")
+                }
+            } catch {
+                Log.pipeline.error("画面分析失败（降级为纯字幕）: \(error.localizedDescription)")
+            }
+        }
+
         // step1 大纲
         onProgress(.init(phase: "AI 大纲", percent: 0.38))
-        let srtText = try String(contentsOf: srtPath, encoding: .utf8)
-        let outlineMD = try await step1Outline(srtText: srtText, contentType: settings.contentType)
+        let outlineMD = try await step1Outline(srtText: srtText, contentType: settings.contentType, visualScript: visualScript)
 
         // step2 时间点
         onProgress(.init(phase: "时间点定位", percent: 0.48))
@@ -79,15 +99,16 @@ final class PipelineService {
     }
 
     // MARK: - step1 大纲
-    func step1Outline(srtText: String, contentType: String) async throws -> String {
+    func step1Outline(srtText: String, contentType: String, visualScript: String = "") async throws -> String {
         let prompt = PromptAssets.load(contentType: contentType, name: "大纲")
+        let extra = visualScript.isEmpty ? "" : "\n\n## 画面脚本（视觉分析，需与字幕结合使用）：\n" + visualScript
         let chunks = Self.chunk(srtText, maxChars: settings.chunkSize)
         var parts: [String] = []
         if chunks.count == 1 {
-            parts.append(try await chat(user: prompt + "\n\n以下是视频SRT字幕：\n" + chunks[0], jsonMode: false))
+            parts.append(try await chat(user: prompt + extra + "\n\n以下是视频SRT字幕：\n" + chunks[0], jsonMode: false))
         } else {
             for (i, c) in chunks.enumerated() {
-                let text = try await chat(user: prompt + "\n\n以下是视频SRT字幕（第 \(i + 1)/\(chunks.count) 段）：\n" + c, jsonMode: false)
+                let text = try await chat(user: prompt + extra + "\n\n以下是视频SRT字幕（第 \(i + 1)/\(chunks.count) 段）：\n" + c, jsonMode: false)
                 parts.append(text)
             }
         }

@@ -95,6 +95,29 @@ struct SettingsView: View {
                     Stepper("切片最长 \(Int(s.clipMaxDuration))s", value: $s.clipMaxDuration, in: 60...600, step: 30)
                 }
 
+                Section("配音（云端 TTS · 限流自动降级）") {
+                    Toggle("启用配音", isOn: $s.dubbingEnabled)
+                    if s.dubbingEnabled {
+                        Picker("声音", selection: $s.dubbingVoiceId) {
+                            ForEach(SettingsStore.availableVoices()) { v in
+                                Text(v.name).tag(v.id)
+                            }
+                        }
+                        HStack {
+                            Text("语速")
+                            Slider(value: $s.dubbingRate, in: 0...1)
+                            Text(String(format: "%.1fx", 0.8 + s.dubbingRate * 0.4)).font(.system(size: 12)).monospacedDigit()
+                        }
+                        HStack {
+                            Text("原音音量")
+                            Slider(value: $s.dubbingVolume, in: 0...0.6)
+                            Text(String(format: "%.0f%%", s.dubbingVolume * 100)).font(.system(size: 12)).monospacedDigit()
+                        }
+                        Text("配音文本 = 切片区间字幕；云端引擎 NVIDIA omni，限流/失败自动切系统声音，不会中断任务。")
+                            .font(.system(size: 11)).foregroundColor(Theme.muted)
+                    }
+                }
+
                 Section("工具") {
                     Button {
                         let url = Paths.root.appendingPathComponent("backend.log")
@@ -124,6 +147,7 @@ struct SettingsView: View {
             .onAppear {
                 apiKey = s.apiKey(for: s.llmProviderId)
                 imageKey = s.apiKey(for: "img.\(s.imageProviderId)")
+                if s.dubbingVoiceId.isEmpty { s.dubbingVoiceId = SettingsStore.defaultVoiceId() }
             }
         }
     }

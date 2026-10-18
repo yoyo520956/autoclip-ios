@@ -108,6 +108,31 @@ final class LLMService {
         return text
     }
 
+    // MARK: - 视觉（多模态）：content 数组格式（OpenAI 兼容；agnes-3.0-flash 实测支持）
+    struct VisionImage { var data: Data; var mime: String = "image/jpeg" }
+
+    func visionChat(system: String, userText: String, images: [VisionImage], maxTokens: Int? = nil, temperature: Double = 0.5) async throws -> String {
+        guard settings.llmReady else { throw LLMError.notConfigured(settings.llmProviderId) }
+        var content: [[String: Any]] = [["type": "text", "text": userText]]
+        for img in images {
+            let b64 = img.data.base64EncodedString()
+            content.append(["type": "image_url", "image_url": ["url": "data:\(img.mime);base64,\(b64)"]])
+        }
+        var messages: [[String: Any]] = []
+        if !system.isEmpty { messages.append(["role": "system", "content": system]) }
+        messages.append(["role": "user", "content": content])
+        let url = URL(string: settings.effectiveLLMBaseURL.trimmingCharacters(in: CharacterSet(charactersIn: "/ ")) + "/chat/completions")!
+        var req = URLRequest(url: url, timeoutInterval: settings.llmTimeout * 8)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let key = settings.apiKey(for: settings.llmProviderId)
+        if !key.isEmpty { req.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization") }
+        let body: [String: Any] = ["model": settings.llmModel, "messages": messages,
+                                   "max_tokens": maxTokens ?? settings.llmMaxTokens, "temperature": temperature]
+        req.httpBody = try JSONSerialization.data(withJSONObject: body)
+        return try await execute(req)
+    }
+
     // MARK: - JSON 工具（对齐原版解析容错）
     static func extractJSON<T: Decodable>(_ text: String, _ type: T.Type) throws -> T {
         let cleaned = text
