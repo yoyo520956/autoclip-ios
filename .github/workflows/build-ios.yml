@@ -54,7 +54,7 @@ jobs:
             -sdk iphoneos -configuration Release \
             -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
-            build | tail -40
+            -quiet build 2>&1 | grep -E "error|warning|BUILD|note:" | tail -80 || true
 
       - name: Package IPA
         run: |
